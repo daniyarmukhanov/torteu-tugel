@@ -131,7 +131,7 @@ export default function Home() {
     <>
       <div className="flex flex-col items-center w-11/12 md:w-3/4 lg:w-7/12 mx-auto mt-14">
         <h1 className="text-black text-4xl font-semibold my-4 ml-4">
-          Байланыс (aka Connections NYT)
+          Төртеу Түгел
         </h1>
         <hr className="mb-4 md:mb-4 w-full"></hr>
         <h1 className="text-black mb-4">Бірдей топқа жататын төрт сөзді табыңыз!</h1>
@@ -154,13 +154,19 @@ export default function Home() {
       </div>
       <GameWonModal
         isOpen={showGameWonModal}
-        onClose={() => setShowGameWonModal(false)}
+        onClose={() => {
+          setShowGameWonModal(false);
+          showPopup("Нәтиже көшірілді!");
+        }}
         guessHistory={guessHistoryRef.current}
         perfection={getPerfection(mistakesRemaining)}
       />
       <GameLostModal
         isOpen={showGameLostModal}
-        onClose={() => setShowGameLostModal(false)}
+        onClose={() => {
+          setShowGameLostModal(false);
+          showPopup("Нәтиже көшірілді!");
+        }}
         guessHistory={guessHistoryRef.current}
       />
     </>

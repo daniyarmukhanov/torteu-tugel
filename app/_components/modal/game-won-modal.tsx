@@ -11,6 +11,40 @@ type GameWonModalProps = {
 };
 
 export default function GameWonModal(props: GameWonModalProps) {
+  const handleShare = async () => {
+    const levelToEmoji: { [key: number]: string } = {
+      1: "🟨", // Yellow
+      2: "🟩", // Green
+      3: "🟦", // Blue
+      4: "🟪", // Purple
+    };
+
+    let historyEmojiString = "";
+    props.guessHistory.forEach((categoryWords) => {
+      if (categoryWords.length > 0) {
+        const level = categoryWords[0].level;
+        const emoji = levelToEmoji[level] || "❔";
+        historyEmojiString += emoji.repeat(4) + "\n";
+      }
+    });
+
+    const shareText = ` ${props.perfection}
+Бүгінгі ойын жеңіспен аяқталды
+
+
+${historyEmojiString}
+${window.location.href}`;
+
+    try {
+      await navigator.clipboard.writeText(shareText.trim());
+      // Optionally, show a success message to the user
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+      // Optionally, show an error message to the user
+    }
+    props.onClose();
+  };
+
   return (
     <GameModal isOpen={props.isOpen} onClose={props.onClose}>
       <div className="flex flex-col items-center justify-center px-12">
@@ -20,7 +54,7 @@ export default function GameWonModal(props: GameWonModalProps) {
         <hr className="mb-2 md:mb-4 w-full"></hr>
         <h2 className="text-black mb-8">{"Бүгінгі ойын жеңіспен аяқталды"}</h2>
         <GuessHistory guessHistory={props.guessHistory} />
-        <ControlButton text="Шығу" onClick={props.onClose} />
+        <ControlButton text="Бөлісу" onClick={handleShare} />
       </div>
     </GameModal>
   );
