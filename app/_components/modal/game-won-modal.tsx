@@ -22,9 +22,10 @@ export default function GameWonModal(props: GameWonModalProps) {
     let historyEmojiString = "";
     props.guessHistory.forEach((categoryWords) => {
       if (categoryWords.length > 0) {
-        const level = categoryWords[0].level;
-        const emoji = levelToEmoji[level] || "❔";
-        historyEmojiString += emoji.repeat(4) + "\n";
+        const row = categoryWords
+          .map((word) => levelToEmoji[word.level] || "❔")
+          .join("");
+        historyEmojiString += row + "\n";
       }
     });
 
