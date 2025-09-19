@@ -1,7 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { categories } from "../_examples";
 import { Category, SubmitResult, Word } from "../_types";
 import { delay, shuffleArray } from "../_utils";
+
+type StoredGameResult = {
+  dateKey: string;
+  status: "win" | "loss";
+  clearedCategories: Category[];
+  guessHistory: Word[][];
+  mistakesRemaining: number;
+};
+
+const STORAGE_KEY = "torteu-tugel-game-result";
+const ASTANA_UTC_OFFSET_HOURS = 5;
+
+const getAstanaDateKey = (date = new Date()): string => {
+  const astanaDate = new Date(
+    date.getTime() + ASTANA_UTC_OFFSET_HOURS * 60 * 60 * 1000
+  );
+
+  return astanaDate.toISOString().split("T")[0];
+};
 
 export default function useGameLogic() {
   const [gameWords, setGameWords] = useState<Word[]>([]);
@@ -21,8 +40,103 @@ export default function useGameLogic() {
         category.items.map((word) => ({ word: word, level: category.level }))
       )
       .flat();
-    setGameWords(shuffleArray(words));
+
+    const shuffledWords = shuffleArray(words);
+
+    if (typeof window === "undefined") {
+      setGameWords(shuffledWords);
+      return;
+    }
+
+    const storedResultRaw = window.localStorage.getItem(STORAGE_KEY);
+
+    if (!storedResultRaw) {
+      setGameWords(shuffledWords);
+      return;
+    }
+
+    try {
+      const storedResult: StoredGameResult = JSON.parse(storedResultRaw);
+      const todayKey = getAstanaDateKey();
+
+      if (storedResult.dateKey !== todayKey) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        setGameWords(shuffledWords);
+        return;
+      }
+
+      if (storedResult.status === "win" || storedResult.status === "loss") {
+        setClearedCategories(storedResult.clearedCategories ?? []);
+        setMistakesRemaning(
+          typeof storedResult.mistakesRemaining === "number"
+            ? storedResult.mistakesRemaining
+            : 0
+        );
+
+        const sanitizedGuessHistory = Array.isArray(storedResult.guessHistory)
+          ? storedResult.guessHistory.map((guess) =>
+              Array.isArray(guess)
+                ? guess.map((word) => ({
+                    word: word.word,
+                    level: word.level,
+                  }))
+                : []
+            )
+          : [];
+
+        guessHistoryRef.current = sanitizedGuessHistory;
+        setGameWords([]);
+
+        if (storedResult.status === "win") {
+          setIsWon(true);
+        } else {
+          setIsLost(true);
+        }
+        return;
+      }
+
+      setGameWords(shuffledWords);
+    } catch (error) {
+      console.error("Failed to parse stored game result", error);
+      window.localStorage.removeItem(STORAGE_KEY);
+      setGameWords(shuffledWords);
+    }
   }, []);
+
+  const saveResult = useCallback(
+    (status: "win" | "loss") => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const sanitizedGuessHistory = guessHistoryRef.current.map((guess) =>
+        guess.map((word) => ({ word: word.word, level: word.level }))
+      );
+
+      const payload: StoredGameResult = {
+        dateKey: getAstanaDateKey(),
+        status,
+        clearedCategories,
+        guessHistory: sanitizedGuessHistory,
+        mistakesRemaining,
+      };
+
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.error("Failed to store game result", error);
+      }
+    },
+    [clearedCategories, guessHistoryRef, mistakesRemaining]
+  );
+
+  useEffect(() => {
+    if (isWon) {
+      saveResult("win");
+    } else if (isLost) {
+      saveResult("loss");
+    }
+  }, [isWon, isLost, saveResult]);
 
   const selectWord = (word: Word): void => {
     const newGameWords = gameWords.map((item) => {

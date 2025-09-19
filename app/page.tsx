@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ControlButton from "./_components/button/control-button";
 import Grid from "./_components/game/grid";
 import GameLostModal from "./_components/modal/game-lost-modal";
@@ -33,6 +33,18 @@ export default function Home() {
   const [showGameWonModal, setShowGameWonModal] = useState(false);
   const [showGameLostModal, setShowGameLostModal] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (isWon) {
+      setShowGameWonModal(true);
+    }
+  }, [isWon]);
+
+  useEffect(() => {
+    if (isLost) {
+      setShowGameLostModal(true);
+    }
+  }, [isLost]);
 
   const {
     guessAnimationState,
