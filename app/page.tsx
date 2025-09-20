@@ -53,7 +53,7 @@ export default function Home() {
         break;
       case "one-away":
         animateWrongGuess();
-        showPopup("Бір ғана сөз қате...");
+        showPopup("Бір-ақ сөз қате...");
         break;
       case "loss":
         showPopup("Келесі жолы байқап көріңіз! Келесі сұрақ ертең болады");
