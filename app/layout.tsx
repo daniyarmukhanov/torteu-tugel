@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Байланыс",
-  description: "Бірдей топқа жататын төрт сөзді табыңыз",
+  title: "ТӨРТЕУ ТҮГЕЛ",
+  description: "Төрт сөзден тұратын төрт санатқа бөліңіз",
 };
 
 export default function RootLayout({
