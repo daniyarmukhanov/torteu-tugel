@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { categories } from "../_examples";
 import { Category, SubmitResult, Word } from "../_types";
 import { delay, shuffleArray } from "../_utils";
@@ -19,9 +19,54 @@ const ASTANA_TIME_ZONE = "Asia/Almaty";
 const ASTANA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: ASTANA_TIME_ZONE,
 });
+const ASTANA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: ASTANA_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
 const DEFAULT_MISTAKES_REMAINING = 4;
 
 const getAstanaDate = () => ASTANA_DATE_FORMATTER.format(new Date());
+
+const getMsUntilNextAstanaMidnight = () => {
+  const now = new Date();
+  const parts = ASTANA_DATE_TIME_FORMATTER.formatToParts(now);
+
+  const getPartValue = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+
+  const year = getPartValue("year");
+  const month = getPartValue("month");
+  const day = getPartValue("day");
+  const hour = getPartValue("hour");
+  const minute = getPartValue("minute");
+  const second = getPartValue("second");
+
+  const astanaNowAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const offset = astanaNowAsUtc - now.getTime();
+  const nextMidnightAsUtc = Date.UTC(year, month - 1, day + 1, 0, 0, 0);
+  const midnightUtc = nextMidnightAsUtc - offset;
+
+  return Math.max(midnightUtc - now.getTime(), 0);
+};
+
+const createShuffledGameWords = (): Word[] =>
+  shuffleArray(
+    categories
+      .map((category) =>
+        category.items.map((word) => ({
+          word,
+          level: category.level,
+          selected: false,
+        }))
+      )
+      .flat()
+  );
 
 const readStoredGameResult = (): StoredGameResult | null => {
   if (typeof window === "undefined") {
@@ -95,27 +140,31 @@ export default function useGameLogic() {
   );
   const guessHistoryRef = useRef<Word[][]>([]);
   const currentAstanaDateRef = useRef<string>(getAstanaDate());
+  const midnightResetTimeoutRef = useRef<number | null>(null);
+
+  const initializeNewGame = useCallback(() => {
+    setGameWords(createShuffledGameWords());
+    setClearedCategories([]);
+    setMistakesRemaning(DEFAULT_MISTAKES_REMAINING);
+    setIsWon(false);
+    setIsLost(false);
+    guessHistoryRef.current = [];
+  }, [setGameWords, setClearedCategories, setMistakesRemaning, setIsWon, setIsLost, guessHistoryRef]);
 
   useEffect(() => {
-    const words: Word[] = categories
-      .map((category) =>
-        category.items.map((word) => ({ word: word, level: category.level }))
-      )
-      .flat();
-
     const today = getAstanaDate();
     currentAstanaDateRef.current = today;
 
     const storedResult = readStoredGameResult();
 
     if (!storedResult) {
-      setGameWords(shuffleArray(words));
+      initializeNewGame();
       return;
     }
 
     if (storedResult.date !== today) {
       clearStoredGameResult();
-      setGameWords(shuffleArray(words));
+      initializeNewGame();
       return;
     }
 
@@ -123,7 +172,7 @@ export default function useGameLogic() {
 
     if (storedResult.status === "in-progress" && storedGameWords.length === 0) {
       clearStoredGameResult();
-      setGameWords(shuffleArray(words));
+      initializeNewGame();
       return;
     }
 
@@ -142,7 +191,43 @@ export default function useGameLogic() {
     } else if (storedResult.status === "loss") {
       setIsLost(true);
     }
-  }, []);
+  }, [initializeNewGame, setGameWords, setClearedCategories, setMistakesRemaning, setIsWon, setIsLost]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleMidnightReset = () => {
+      clearStoredGameResult();
+      initializeNewGame();
+      currentAstanaDateRef.current = getAstanaDate();
+    };
+
+    const scheduleMidnightReset = () => {
+      const msUntilMidnight = getMsUntilNextAstanaMidnight();
+
+      if (msUntilMidnight <= 0) {
+        handleMidnightReset();
+        scheduleMidnightReset();
+        return;
+      }
+
+      midnightResetTimeoutRef.current = window.setTimeout(() => {
+        handleMidnightReset();
+        scheduleMidnightReset();
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnightReset();
+
+    return () => {
+      if (midnightResetTimeoutRef.current !== null) {
+        window.clearTimeout(midnightResetTimeoutRef.current);
+        midnightResetTimeoutRef.current = null;
+      }
+    };
+  }, [initializeNewGame]);
 
   const persistGameState = (
     status: StoredGameStatus,
