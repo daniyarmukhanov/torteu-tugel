@@ -1,7 +1,164 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { categories } from "../_examples";
 import { Category, SubmitResult, Word } from "../_types";
 import { delay, shuffleArray } from "../_utils";
+
+type StoredGameStatus = "in-progress" | "loss" | "win";
+
+type StoredGameResult = {
+  date: string;
+  status: StoredGameStatus;
+  clearedCategories: Category[];
+  guessHistory: Word[][];
+  mistakesRemaining: number;
+  gameWords: Word[];
+};
+
+const STORAGE_KEY = "storedGameResult";
+const ASTANA_TIME_ZONE = "Asia/Almaty";
+const ASTANA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: ASTANA_TIME_ZONE,
+});
+const ASTANA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: ASTANA_TIME_ZONE,
+  hour12: false,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+const DEFAULT_MISTAKES_REMAINING = 4;
+
+type AstanaDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+const getAstanaDate = () => ASTANA_DATE_FORMATTER.format(new Date());
+
+const getAstanaDateTimeParts = (): AstanaDateTimeParts => {
+  const parts = ASTANA_DATE_TIME_FORMATTER.formatToParts(new Date());
+  const result: Partial<AstanaDateTimeParts> = {};
+
+  for (const part of parts) {
+    if (part.type === "literal") {
+      continue;
+    }
+
+    const numericValue = Number(part.value);
+
+    if (!Number.isNaN(numericValue)) {
+      result[part.type as keyof AstanaDateTimeParts] = numericValue;
+    }
+  }
+
+  const { year, month, day, hour, minute, second } = result;
+
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    hour === undefined ||
+    minute === undefined ||
+    second === undefined
+  ) {
+    const fallback = new Date();
+
+    return {
+      year: fallback.getUTCFullYear(),
+      month: fallback.getUTCMonth() + 1,
+      day: fallback.getUTCDate(),
+      hour: fallback.getUTCHours(),
+      minute: fallback.getUTCMinutes(),
+      second: fallback.getUTCSeconds(),
+    };
+  }
+
+  return { year, month, day, hour, minute, second };
+};
+
+const getMillisecondsUntilNextAstanaMidnight = () => {
+  const { year, month, day, hour, minute, second } = getAstanaDateTimeParts();
+  const astanaNow = Date.UTC(year, month - 1, day, hour, minute, second);
+  const nextMidnight = Date.UTC(year, month - 1, day + 1, 0, 0, 0);
+
+  return Math.max(0, nextMidnight - astanaNow);
+};
+
+const createInitialGameWords = (): Word[] =>
+  shuffleArray(
+    categories.flatMap((category) =>
+      category.items.map((word) => ({
+        word,
+        level: category.level,
+        selected: false,
+      }))
+    )
+  );
+
+const readStoredGameResult = (): StoredGameResult | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredGameResult>;
+
+    if (!parsed || typeof parsed !== "object") {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    const status = parsed.status;
+    const date = parsed.date;
+
+    const isValidStatus =
+      status === "in-progress" || status === "win" || status === "loss";
+
+    if (!isValidStatus || typeof date !== "string") {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      date,
+      status,
+      clearedCategories: Array.isArray(parsed.clearedCategories)
+        ? (parsed.clearedCategories as Category[])
+        : [],
+      guessHistory: Array.isArray(parsed.guessHistory)
+        ? (parsed.guessHistory as Word[][])
+        : [],
+      mistakesRemaining:
+        typeof parsed.mistakesRemaining === "number"
+          ? parsed.mistakesRemaining
+          : DEFAULT_MISTAKES_REMAINING,
+      gameWords: Array.isArray(parsed.gameWords)
+        ? (parsed.gameWords as Word[])
+        : [],
+    };
+  } catch {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+};
+
+const clearStoredGameResult = () => {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+};
 
 export default function useGameLogic() {
   const [gameWords, setGameWords] = useState<Word[]>([]);
@@ -12,17 +169,132 @@ export default function useGameLogic() {
   const [clearedCategories, setClearedCategories] = useState<Category[]>([]);
   const [isWon, setIsWon] = useState(false);
   const [isLost, setIsLost] = useState(false);
-  const [mistakesRemaining, setMistakesRemaning] = useState(4);
+  const [mistakesRemaining, setMistakesRemaning] = useState(
+    DEFAULT_MISTAKES_REMAINING
+  );
   const guessHistoryRef = useRef<Word[][]>([]);
+  const currentAstanaDateRef = useRef<string>(getAstanaDate());
+
+  const resetGameStateForNewDay = useCallback((nextDate: string) => {
+    currentAstanaDateRef.current = nextDate;
+    clearStoredGameResult();
+    guessHistoryRef.current = [];
+    setClearedCategories([]);
+    setMistakesRemaning(DEFAULT_MISTAKES_REMAINING);
+    setIsWon(false);
+    setIsLost(false);
+    setGameWords(createInitialGameWords());
+  }, []);
 
   useEffect(() => {
-    const words: Word[] = categories
-      .map((category) =>
-        category.items.map((word) => ({ word: word, level: category.level }))
-      )
-      .flat();
-    setGameWords(shuffleArray(words));
+    const today = getAstanaDate();
+    currentAstanaDateRef.current = today;
+
+    const storedResult = readStoredGameResult();
+
+    if (!storedResult) {
+      setGameWords(createInitialGameWords());
+      return;
+    }
+
+    if (storedResult.date !== today) {
+      clearStoredGameResult();
+      setGameWords(createInitialGameWords());
+      return;
+    }
+
+    const storedGameWords = storedResult.gameWords;
+
+    if (storedResult.status === "in-progress" && storedGameWords.length === 0) {
+      clearStoredGameResult();
+      setGameWords(createInitialGameWords());
+      return;
+    }
+
+    const sanitizedGameWords = storedGameWords.map((word) => ({
+      ...word,
+      selected: Boolean(word.selected),
+    }));
+
+    setGameWords(sanitizedGameWords);
+    setClearedCategories(storedResult.clearedCategories);
+    setMistakesRemaning(storedResult.mistakesRemaining);
+    guessHistoryRef.current = storedResult.guessHistory;
+
+    if (storedResult.status === "win") {
+      setIsWon(true);
+    } else if (storedResult.status === "loss") {
+      setIsLost(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let midnightTimeoutId: number | null = null;
+
+    const resetForNewDay = () => {
+      const today = getAstanaDate();
+
+      if (currentAstanaDateRef.current === today) {
+        return;
+      }
+
+      resetGameStateForNewDay(today);
+    };
+
+    const scheduleMidnightReset = () => {
+      const delayUntilMidnight = getMillisecondsUntilNextAstanaMidnight();
+
+      midnightTimeoutId = window.setTimeout(() => {
+        resetForNewDay();
+        scheduleMidnightReset();
+      }, delayUntilMidnight);
+    };
+
+    scheduleMidnightReset();
+
+    return () => {
+      if (midnightTimeoutId !== null) {
+        window.clearTimeout(midnightTimeoutId);
+      }
+    };
+  }, [resetGameStateForNewDay]);
+
+  const persistGameState = (
+    status: StoredGameStatus,
+    overrides: Partial<Omit<StoredGameResult, "status" | "date">> = {}
+  ) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const today = getAstanaDate();
+
+    if (currentAstanaDateRef.current !== today) {
+      resetGameStateForNewDay(today);
+      return;
+    }
+
+    const payload: StoredGameResult = {
+      date: today,
+      status,
+      clearedCategories:
+        overrides.clearedCategories ?? clearedCategories,
+      gameWords: overrides.gameWords ?? gameWords,
+      guessHistory: overrides.guessHistory ?? guessHistoryRef.current,
+      mistakesRemaining:
+        overrides.mistakesRemaining ?? mistakesRemaining,
+    };
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore write errors (e.g., storage disabled).
+    }
+  };
 
   const selectWord = (word: Word): void => {
     const newGameWords = gameWords.map((item) => {
@@ -80,12 +352,22 @@ export default function useGameLogic() {
   };
 
   const getCorrectResult = (category: Category): SubmitResult => {
-    setClearedCategories([...clearedCategories, category]);
-    setGameWords(
-      gameWords.filter((item) => !category.items.includes(item.word))
+    const updatedClearedCategories = [...clearedCategories, category];
+    const updatedGameWords = gameWords.filter(
+      (item) => !category.items.includes(item.word)
     );
 
-    if (clearedCategories.length === 3) {
+    setClearedCategories(updatedClearedCategories);
+    setGameWords(updatedGameWords);
+
+    const hasWon = updatedClearedCategories.length === categories.length;
+
+    persistGameState(hasWon ? "win" : "in-progress", {
+      clearedCategories: updatedClearedCategories,
+      gameWords: updatedGameWords,
+    });
+
+    if (hasWon) {
       return { result: "win" };
     } else {
       return { result: "correct" };
@@ -93,9 +375,17 @@ export default function useGameLogic() {
   };
 
   const getIncorrectResult = (maxLikeness: number): SubmitResult => {
-    setMistakesRemaning(mistakesRemaining - 1);
+    const updatedMistakesRemaining = mistakesRemaining - 1;
+    setMistakesRemaning(updatedMistakesRemaining);
 
-    if (mistakesRemaining === 1) {
+    const didLose = updatedMistakesRemaining === 0;
+
+    persistGameState(didLose ? "loss" : "in-progress", {
+      mistakesRemaining: updatedMistakesRemaining,
+      gameWords,
+    });
+
+    if (didLose) {
       return { result: "loss" };
     } else if (maxLikeness === 3) {
       return { result: "one-away" };
