@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { categories, puzzleId as currentPuzzleId } from "../_examples";
+import { fetchDailyPuzzle } from "../_examples";
 import { Category, SubmitResult, Word } from "../_types";
+import { getAstanaDate, getMsUntilNextAstanaMidnight } from "../_time";
 import { delay, shuffleArray } from "../_utils";
 
 type StoredGameStatus = "in-progress" | "loss" | "win";
@@ -16,49 +17,11 @@ type StoredGameResult = {
 };
 
 const STORAGE_KEY = "storedGameResult";
-const ASTANA_TIME_ZONE = "Asia/Almaty";
-const ASTANA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
-  timeZone: ASTANA_TIME_ZONE,
-});
-const ASTANA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-CA", {
-  timeZone: ASTANA_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
 const DEFAULT_MISTAKES_REMAINING = 4;
 
-const getAstanaDate = () => ASTANA_DATE_FORMATTER.format(new Date());
-
-const getMsUntilNextAstanaMidnight = () => {
-  const now = new Date();
-  const parts = ASTANA_DATE_TIME_FORMATTER.formatToParts(now);
-
-  const getPartValue = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value ?? "0");
-
-  const year = getPartValue("year");
-  const month = getPartValue("month");
-  const day = getPartValue("day");
-  const hour = getPartValue("hour");
-  const minute = getPartValue("minute");
-  const second = getPartValue("second");
-
-  const astanaNowAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const offset = astanaNowAsUtc - now.getTime();
-  const nextMidnightAsUtc = Date.UTC(year, month - 1, day + 1, 0, 0, 0);
-  const midnightUtc = nextMidnightAsUtc - offset;
-
-  return Math.max(midnightUtc - now.getTime(), 0);
-};
-
-const createShuffledGameWords = (): Word[] =>
+const createShuffledGameWords = (categoryList: Category[]): Word[] =>
   shuffleArray(
-    categories
+    categoryList
       .map((category) =>
         category.items.map((word) => ({
           word,
@@ -131,6 +94,9 @@ const clearStoredGameResult = () => {
 };
 
 export default function useGameLogic() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [currentPuzzleId, setCurrentPuzzleId] = useState<string | null>(null);
+  const [isPuzzleLoading, setIsPuzzleLoading] = useState(true);
   const [gameWords, setGameWords] = useState<Word[]>([]);
   const selectedWords = useMemo(
     () => gameWords.filter((item) => item.selected),
@@ -145,36 +111,90 @@ export default function useGameLogic() {
   const guessHistoryRef = useRef<Word[][]>([]);
   const currentAstanaDateRef = useRef<string>(getAstanaDate());
   const midnightResetTimeoutRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
 
-  const initializeNewGame = useCallback(() => {
-    setGameWords(createShuffledGameWords());
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const initializeNewGame = useCallback((categoryList: Category[]) => {
+    const newGameWords =
+      categoryList.length > 0 ? createShuffledGameWords(categoryList) : [];
+
+    setGameWords(newGameWords);
     setClearedCategories([]);
     setMistakesRemaning(DEFAULT_MISTAKES_REMAINING);
     setIsWon(false);
     setIsLost(false);
     guessHistoryRef.current = [];
-  }, [setGameWords, setClearedCategories, setMistakesRemaning, setIsWon, setIsLost, guessHistoryRef]);
+  }, []);
+
+  const loadPuzzle = useCallback(async () => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setIsPuzzleLoading(true);
+
+    try {
+      const puzzle = await fetchDailyPuzzle();
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setCategories(puzzle.categories);
+      setCurrentPuzzleId(puzzle.puzzleId);
+    } catch (error) {
+      console.error("Failed to load puzzle data", error);
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setCategories([]);
+      setCurrentPuzzleId(null);
+    } finally {
+      if (isMountedRef.current) {
+        setIsPuzzleLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
+    loadPuzzle();
+  }, [loadPuzzle]);
+
+  useEffect(() => {
+    if (isPuzzleLoading) {
+      return;
+    }
+
+    if (categories.length === 0 || !currentPuzzleId) {
+      initializeNewGame([]);
+      return;
+    }
+
     const today = getAstanaDate();
     currentAstanaDateRef.current = today;
 
     const storedResult = readStoredGameResult();
 
     if (!storedResult) {
-      initializeNewGame();
+      initializeNewGame(categories);
       return;
     }
 
     if (storedResult.puzzleId !== currentPuzzleId) {
       clearStoredGameResult();
-      initializeNewGame();
+      initializeNewGame(categories);
       return;
     }
 
     if (storedResult.date !== today) {
       clearStoredGameResult();
-      initializeNewGame();
+      initializeNewGame(categories);
       return;
     }
 
@@ -182,7 +202,7 @@ export default function useGameLogic() {
 
     if (storedResult.status === "in-progress" && storedGameWords.length === 0) {
       clearStoredGameResult();
-      initializeNewGame();
+      initializeNewGame(categories);
       return;
     }
 
@@ -201,31 +221,34 @@ export default function useGameLogic() {
     } else if (storedResult.status === "loss") {
       setIsLost(true);
     }
-  }, [initializeNewGame, setGameWords, setClearedCategories, setMistakesRemaning, setIsWon, setIsLost]);
+  }, [categories, currentPuzzleId, initializeNewGame, isPuzzleLoading]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const handleMidnightReset = () => {
+    const handleMidnightReset = async () => {
       clearStoredGameResult();
-      initializeNewGame();
+      initializeNewGame([]);
       currentAstanaDateRef.current = getAstanaDate();
+      await loadPuzzle();
     };
 
     const scheduleMidnightReset = () => {
       const msUntilMidnight = getMsUntilNextAstanaMidnight();
 
       if (msUntilMidnight <= 0) {
-        handleMidnightReset();
-        scheduleMidnightReset();
+        void handleMidnightReset().then(() => {
+          scheduleMidnightReset();
+        });
         return;
       }
 
       midnightResetTimeoutRef.current = window.setTimeout(() => {
-        handleMidnightReset();
-        scheduleMidnightReset();
+        void handleMidnightReset().then(() => {
+          scheduleMidnightReset();
+        });
       }, msUntilMidnight);
     };
 
@@ -237,13 +260,13 @@ export default function useGameLogic() {
         midnightResetTimeoutRef.current = null;
       }
     };
-  }, [initializeNewGame]);
+  }, [initializeNewGame, loadPuzzle]);
 
   const persistGameState = (
     status: StoredGameStatus,
     overrides: Partial<Omit<StoredGameResult, "status" | "date" | "puzzleId">> = {}
   ) => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !currentPuzzleId) {
       return;
     }
 
@@ -275,7 +298,6 @@ export default function useGameLogic() {
 
   const selectWord = (word: Word): void => {
     const newGameWords = gameWords.map((item) => {
-      // Only allow word to be selected if there are less than 4 selected words
       if (word.word === item.word) {
         return {
           ...item,
@@ -295,9 +317,10 @@ export default function useGameLogic() {
 
   const deselectAllWords = () => {
     setGameWords(
-      gameWords.map((item) => {
-        return { ...item, selected: false };
-      })
+      gameWords.map((item) => ({
+        ...item,
+        selected: false,
+      }))
     );
   };
 
@@ -313,10 +336,13 @@ export default function useGameLogic() {
 
     guessHistoryRef.current.push(selectedWords);
 
-    const likenessCounts = categories.map((category) => {
-      return selectedWords.filter((item) => category.items.includes(item.word))
-        .length;
-    });
+    if (categories.length === 0) {
+      return { result: "incorrect" };
+    }
+
+    const likenessCounts = categories.map((category) =>
+      selectedWords.filter((item) => category.items.includes(item.word)).length
+    );
 
     const maxLikeness = Math.max(...likenessCounts);
     const maxIndex = likenessCounts.indexOf(maxLikeness);
