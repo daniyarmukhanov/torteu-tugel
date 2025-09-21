@@ -151,6 +151,16 @@ export default function Home() {
           {mistakesRemaining > 0 ? Array(mistakesRemaining).fill("•") : ""}
         </h2>
         {renderControlButtons()}
+        <footer className="mt-4 mb-8 text-center text-sm">
+          <a
+            href="https://forms.gle/YZ4FnMMSrRDFbJ1w8"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            Өз сұрағымды ұсыну
+          </a>
+        </footer>
       </div>
       <GameWonModal
         isOpen={showGameWonModal}
