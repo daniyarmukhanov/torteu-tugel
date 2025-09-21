@@ -19,6 +19,10 @@ type StoredGameResult = {
 const STORAGE_KEY = "storedGameResult";
 const DEFAULT_MISTAKES_REMAINING = 4;
 
+type LoadPuzzleOptions = {
+  forceRefresh?: boolean;
+};
+
 const createShuffledGameWords = (categoryList: Category[]): Word[] =>
   shuffleArray(
     categoryList
@@ -114,6 +118,8 @@ export default function useGameLogic() {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
     };
@@ -131,7 +137,7 @@ export default function useGameLogic() {
     guessHistoryRef.current = [];
   }, []);
 
-  const loadPuzzle = useCallback(async () => {
+  const loadPuzzle = useCallback(async (options: LoadPuzzleOptions = {}) => {
     if (!isMountedRef.current) {
       return;
     }
@@ -139,7 +145,7 @@ export default function useGameLogic() {
     setIsPuzzleLoading(true);
 
     try {
-      const puzzle = await fetchDailyPuzzle();
+      const puzzle = await fetchDailyPuzzle(options);
 
       if (!isMountedRef.current) {
         return;
@@ -232,7 +238,7 @@ export default function useGameLogic() {
       clearStoredGameResult();
       initializeNewGame([]);
       currentAstanaDateRef.current = getAstanaDate();
-      await loadPuzzle();
+      await loadPuzzle({ forceRefresh: true });
     };
 
     const scheduleMidnightReset = () => {
