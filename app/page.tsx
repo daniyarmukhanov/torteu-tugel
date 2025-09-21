@@ -134,7 +134,7 @@ export default function Home() {
           ТӨРТЕУ ТҮГЕЛ
         </h1>
         <hr className="mb-4 md:mb-4 w-full"></hr>
-        <h1 className="text-black mb-4">Бірдей топқа жататын төрт сөзді табыңыз!</h1>
+        <h1 className="text-black mb-4">Төрт сөзден тұратын төрт санатқа бөліңіз</h1>
         <div className="relative w-full">
           <Popup show={popupState.show} message={popupState.message} />
           <Grid
