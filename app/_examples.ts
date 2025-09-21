@@ -1,37 +1,68 @@
-import { Category } from "./_types";
+import { DailyPuzzle, normalizeText } from "./_puzzle-data";
 
-export const categories: Category[] = [
-  {
-    category: "ПАРСЫТҮБІРЛІ СӨЗДЕР",
-    items: ["ОРАЗА", "АБЫРОЙ", "ПЕРІШТЕ", "КІНӘ"],
-    level: 1,
-  },
-  {
-    category: "ІЛЕ АЛАБЫНДАҒЫ ӨЗЕНДЕР",
-    items: ["КҮРТІ", "ҚАСҚЕЛЕҢ", "ШІЛІК", "ҚАС"],
-    level: 2,
-  },
-  {
-    category: "КӨНЕРГЕН АЙ АТАУЛАРЫ",
-    items: ["ДӘЛУ", "АҚЫРАП", "АМАЛ", "ӘСЕТ"],
-    level: 3,
-  },
-  {
-    category: "ӨЛШЕМ БІРЛІКТЕРІ",
-    items: ["ВОЛЬТ", "АМПЕР", "ОМ", "ВАТТ"],
-    level: 4,
+type FetchDailyPuzzleOptions = {
+  forceRefresh?: boolean;
+};
+
+const normalizePuzzle = (puzzle: DailyPuzzle): DailyPuzzle => ({
+  ...puzzle,
+  categories: puzzle.categories.map((category) => ({
+    ...category,
+    category: normalizeText(category.category),
+    items: category.items.map((item) => normalizeText(item)),
+  })),
+});
+
+let cachedPuzzle: DailyPuzzle | null = null;
+let pendingPuzzlePromise: Promise<DailyPuzzle> | null = null;
+
+const requestPuzzleFromApi = async (): Promise<DailyPuzzle> => {
+  const response = await fetch("/api/puzzle", { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch puzzle: ${response.status}`);
   }
-];
 
-const buildPuzzleId = (data: Category[]): string =>
-  data
-    .map((category) =>
-      [
-        category.level,
-        category.category,
-        ...category.items,
-      ].join(":")
-    )
-    .join("|");
+  const puzzle = (await response.json()) as DailyPuzzle;
 
-export const puzzleId = buildPuzzleId(categories);
+  return normalizePuzzle(puzzle);
+};
+
+export const fetchDailyPuzzle = async (
+  options: FetchDailyPuzzleOptions = {}
+): Promise<DailyPuzzle> => {
+  const { forceRefresh = false } = options;
+
+  if (pendingPuzzlePromise) {
+    return pendingPuzzlePromise;
+  }
+
+  if (!forceRefresh && cachedPuzzle) {
+    return cachedPuzzle;
+  }
+
+  const previousPuzzle = cachedPuzzle;
+
+  if (forceRefresh) {
+    cachedPuzzle = null;
+  }
+
+  const fetchPromise = requestPuzzleFromApi()
+    .then((puzzle) => {
+      cachedPuzzle = puzzle;
+      return puzzle;
+    })
+    .catch((error) => {
+      if (forceRefresh) {
+        cachedPuzzle = previousPuzzle;
+      }
+      throw error;
+    })
+    .finally(() => {
+      pendingPuzzlePromise = null;
+    });
+
+  pendingPuzzlePromise = fetchPromise;
+
+  return fetchPromise;
+};
