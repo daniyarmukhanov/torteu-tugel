@@ -22,3 +22,16 @@ export const categories: Category[] = [
     level: 4,
   }
 ];
+
+const buildPuzzleId = (data: Category[]): string =>
+  data
+    .map((category) =>
+      [
+        category.level,
+        category.category,
+        ...category.items,
+      ].join(":")
+    )
+    .join("|");
+
+export const puzzleId = buildPuzzleId(categories);

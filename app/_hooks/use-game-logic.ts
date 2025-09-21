@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { categories } from "../_examples";
+import { categories, puzzleId as currentPuzzleId } from "../_examples";
 import { Category, SubmitResult, Word } from "../_types";
 import { delay, shuffleArray } from "../_utils";
 
@@ -12,6 +12,7 @@ type StoredGameResult = {
   guessHistory: Word[][];
   mistakesRemaining: number;
   gameWords: Word[];
+  puzzleId: string;
 };
 
 const STORAGE_KEY = "storedGameResult";
@@ -88,11 +89,13 @@ const readStoredGameResult = (): StoredGameResult | null => {
 
     const status = parsed.status;
     const date = parsed.date;
+    const storedPuzzleId =
+      typeof parsed.puzzleId === "string" ? parsed.puzzleId : null;
 
     const isValidStatus =
       status === "in-progress" || status === "win" || status === "loss";
 
-    if (!isValidStatus || typeof date !== "string") {
+    if (!isValidStatus || typeof date !== "string" || !storedPuzzleId) {
       window.localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -100,6 +103,7 @@ const readStoredGameResult = (): StoredGameResult | null => {
     return {
       date,
       status,
+      puzzleId: storedPuzzleId,
       clearedCategories: Array.isArray(parsed.clearedCategories)
         ? (parsed.clearedCategories as Category[])
         : [],
@@ -158,6 +162,12 @@ export default function useGameLogic() {
     const storedResult = readStoredGameResult();
 
     if (!storedResult) {
+      initializeNewGame();
+      return;
+    }
+
+    if (storedResult.puzzleId !== currentPuzzleId) {
+      clearStoredGameResult();
       initializeNewGame();
       return;
     }
@@ -231,7 +241,7 @@ export default function useGameLogic() {
 
   const persistGameState = (
     status: StoredGameStatus,
-    overrides: Partial<Omit<StoredGameResult, "status" | "date">> = {}
+    overrides: Partial<Omit<StoredGameResult, "status" | "date" | "puzzleId">> = {}
   ) => {
     if (typeof window === "undefined") {
       return;
@@ -247,6 +257,7 @@ export default function useGameLogic() {
     const payload: StoredGameResult = {
       date: today,
       status,
+      puzzleId: currentPuzzleId,
       clearedCategories:
         overrides.clearedCategories ?? clearedCategories,
       gameWords: overrides.gameWords ?? gameWords,
