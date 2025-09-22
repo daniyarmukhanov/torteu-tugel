@@ -1,4 +1,4 @@
-import { DailyPuzzle, normalizeText } from "./_puzzle-data";
+import { DailyPuzzle, fetchCsvPuzzle, normalizeText } from "./_puzzle-data";
 
 type FetchDailyPuzzleOptions = {
   forceRefresh?: boolean;
@@ -16,14 +16,8 @@ const normalizePuzzle = (puzzle: DailyPuzzle): DailyPuzzle => ({
 let cachedPuzzle: DailyPuzzle | null = null;
 let pendingPuzzlePromise: Promise<DailyPuzzle> | null = null;
 
-const requestPuzzleFromApi = async (): Promise<DailyPuzzle> => {
-  const response = await fetch("/api/puzzle", { cache: "no-store" });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch puzzle: ${response.status}`);
-  }
-
-  const puzzle = (await response.json()) as DailyPuzzle;
+const requestPuzzleFromCsv = async (): Promise<DailyPuzzle> => {
+  const puzzle = await fetchCsvPuzzle();
 
   return normalizePuzzle(puzzle);
 };
@@ -47,7 +41,7 @@ export const fetchDailyPuzzle = async (
     cachedPuzzle = null;
   }
 
-  const fetchPromise = requestPuzzleFromApi()
+  const fetchPromise = requestPuzzleFromCsv()
     .then((puzzle) => {
       cachedPuzzle = puzzle;
       return puzzle;
