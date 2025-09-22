@@ -46,6 +46,10 @@ ${window.location.href}`;
     props.onClose();
   };
 
+  const handleGoToSozdilge = () => {
+    window.open("https://wordle.kz/", "_blank", "noopener,noreferrer");
+  };
+
   return (
     <GameModal isOpen={props.isOpen} onClose={props.onClose}>
       <div className="flex flex-col items-center justify-center px-12">
@@ -55,7 +59,13 @@ ${window.location.href}`;
         <hr className="mb-2 md:mb-4 w-full"></hr>
         <h2 className="text-black mb-8">{"Бүгінгі ойын жеңіспен аяқталды"}</h2>
         <GuessHistory guessHistory={props.guessHistory} />
-        <ControlButton text="Бөлісу" onClick={handleShare} />
+        <div className="mt-6 flex items-center justify-center gap-4">
+          <ControlButton text="Бөлісу" onClick={handleShare} />
+          <ControlButton
+            text="Сөзділге көшу"
+            onClick={handleGoToSozdilge}
+          />
+        </div>
       </div>
     </GameModal>
   );
