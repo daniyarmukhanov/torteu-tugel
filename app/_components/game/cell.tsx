@@ -30,10 +30,18 @@ export default function Cell(props: CellProps) {
       const maxFontSize = isDesktop ? 24 : 16;
       const minFontSize = 10;
 
+      const headingStyles = window.getComputedStyle(heading);
+      const paddingLeft = parseFloat(headingStyles.paddingLeft) || 0;
+      const paddingRight = parseFloat(headingStyles.paddingRight) || 0;
+      const horizontalPadding = paddingLeft + paddingRight;
+
+      const getContentWidth = () => heading.scrollWidth - horizontalPadding;
+      const availableWidth = button.clientWidth - horizontalPadding;
+
       heading.style.fontSize = `${maxFontSize}px`;
 
       while (
-        heading.scrollWidth > button.clientWidth &&
+        getContentWidth() > availableWidth &&
         parseFloat(heading.style.fontSize) > minFontSize
       ) {
         const nextSize = Math.max(minFontSize, parseFloat(heading.style.fontSize) - 1);
@@ -68,7 +76,7 @@ export default function Cell(props: CellProps) {
     >
       <h2
         ref={headingRef}
-        className={`${textColor} text-center font-bold whitespace-nowrap px-2`}
+        className={`${textColor} mx-auto inline-block whitespace-nowrap px-2 text-center font-bold`}
       >
         {props.cellValue.word.toUpperCase()}
       </h2>
