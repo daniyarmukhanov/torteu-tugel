@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
+
 import { Word } from "@/app/_types";
 
 type CellProps = {
@@ -22,48 +24,49 @@ export default function Cell(props: CellProps) {
     const heading = headingRef.current;
 
     if (!button || !heading) {
-      return;
+      return undefined;
     }
 
     const adjustFontSize = () => {
-      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+      const isDesktop = window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
       const maxFontSize = isDesktop ? 24 : 16;
       const minFontSize = 10;
-
-      const headingStyles = window.getComputedStyle(heading);
-      const headingPaddingLeft = parseFloat(headingStyles.paddingLeft) || 0;
-      const headingPaddingRight = parseFloat(headingStyles.paddingRight) || 0;
-      const headingHorizontalPadding = headingPaddingLeft + headingPaddingRight;
 
       const buttonStyles = window.getComputedStyle(button);
       const buttonPaddingLeft = parseFloat(buttonStyles.paddingLeft) || 0;
       const buttonPaddingRight = parseFloat(buttonStyles.paddingRight) || 0;
-      const buttonHorizontalPadding = buttonPaddingLeft + buttonPaddingRight;
-
-      const getContentWidth = () => heading.scrollWidth - headingHorizontalPadding;
       const availableWidth = Math.max(
         0,
-        button.clientWidth - buttonHorizontalPadding
+        button.clientWidth - (buttonPaddingLeft + buttonPaddingRight)
       );
 
       heading.style.fontSize = `${maxFontSize}px`;
 
-      while (
-        getContentWidth() > availableWidth &&
-        parseFloat(heading.style.fontSize) > minFontSize
-      ) {
-        const nextSize = Math.max(minFontSize, parseFloat(heading.style.fontSize) - 1);
-        heading.style.fontSize = `${nextSize}px`;
+      const headingWidth = heading.scrollWidth;
+
+      if (headingWidth <= availableWidth || availableWidth === 0) {
+        return;
       }
+
+      const ratio = availableWidth / headingWidth;
+      const nextSize = Math.max(
+        minFontSize,
+        Math.min(maxFontSize, Math.floor(maxFontSize * ratio))
+      );
+
+      heading.style.fontSize = `${nextSize}px`;
     };
 
     adjustFontSize();
 
-    const handleResize = () => adjustFontSize();
-    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(() => {
+      adjustFontSize();
+    });
+
+    resizeObserver.observe(button);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
     };
   }, [props.cellValue.word]);
 
