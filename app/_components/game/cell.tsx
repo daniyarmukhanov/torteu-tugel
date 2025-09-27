@@ -68,7 +68,7 @@ export default function Cell(props: CellProps) {
     >
       <h2
         ref={headingRef}
-        className={`${textColor} text-center font-bold whitespace-nowrap`}
+        className={`${textColor} text-center font-bold whitespace-nowrap px-2`}
       >
         {props.cellValue.word.toUpperCase()}
       </h2>
