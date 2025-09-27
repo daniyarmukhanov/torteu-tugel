@@ -17,7 +17,7 @@ export default function Cell(props: CellProps) {
   const bgColor = props.cellValue.selected ? "bg-slate-500" : "bg-slate-200";
   const textColor = props.cellValue.selected ? "text-stone-100" : "text-black";
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  const headingRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const button = buttonRef.current;
@@ -30,7 +30,7 @@ export default function Cell(props: CellProps) {
     const adjustFontSize = () => {
       const isDesktop = window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
       const maxFontSize = isDesktop ? 24 : 16;
-      const minFontSize = 10;
+      const minFontSize = 4;
 
       const buttonStyles = window.getComputedStyle(button);
       const buttonPaddingLeft = parseFloat(buttonStyles.paddingLeft) || 0;
@@ -85,11 +85,13 @@ export default function Cell(props: CellProps) {
       className={`${bgColor} flex items-center justify-center rounded-md px-3 py-6 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
       onClick={handleClick}
     >
-      <h2
-        ref={headingRef}
-        className={`${textColor} block min-w-0 max-w-full whitespace-nowrap px-2 text-center font-bold`}
-      >
-        {props.cellValue.word.toUpperCase()}
+      <h2 className={`${textColor} flex w-full justify-center text-center font-bold`}>
+        <span
+          ref={headingRef}
+          className="inline-block min-w-0 max-w-full whitespace-nowrap px-2"
+        >
+          {props.cellValue.word.toUpperCase()}
+        </span>
       </h2>
     </button>
   );
