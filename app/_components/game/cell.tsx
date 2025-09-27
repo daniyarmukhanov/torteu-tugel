@@ -31,12 +31,20 @@ export default function Cell(props: CellProps) {
       const minFontSize = 10;
 
       const headingStyles = window.getComputedStyle(heading);
-      const paddingLeft = parseFloat(headingStyles.paddingLeft) || 0;
-      const paddingRight = parseFloat(headingStyles.paddingRight) || 0;
-      const horizontalPadding = paddingLeft + paddingRight;
+      const headingPaddingLeft = parseFloat(headingStyles.paddingLeft) || 0;
+      const headingPaddingRight = parseFloat(headingStyles.paddingRight) || 0;
+      const headingHorizontalPadding = headingPaddingLeft + headingPaddingRight;
 
-      const getContentWidth = () => heading.scrollWidth - horizontalPadding;
-      const availableWidth = button.clientWidth - horizontalPadding;
+      const buttonStyles = window.getComputedStyle(button);
+      const buttonPaddingLeft = parseFloat(buttonStyles.paddingLeft) || 0;
+      const buttonPaddingRight = parseFloat(buttonStyles.paddingRight) || 0;
+      const buttonHorizontalPadding = buttonPaddingLeft + buttonPaddingRight;
+
+      const getContentWidth = () => heading.scrollWidth - headingHorizontalPadding;
+      const availableWidth = Math.max(
+        0,
+        button.clientWidth - buttonHorizontalPadding
+      );
 
       heading.style.fontSize = `${maxFontSize}px`;
 
@@ -71,12 +79,12 @@ export default function Cell(props: CellProps) {
   return (
     <button
       ref={buttonRef}
-      className={`${bgColor} py-6 rounded-md px-1 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
+      className={`${bgColor} flex items-center justify-center rounded-md px-3 py-6 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
       onClick={handleClick}
     >
       <h2
         ref={headingRef}
-        className={`${textColor} mx-auto inline-block whitespace-nowrap px-2 text-center font-bold`}
+        className={`${textColor} block min-w-0 max-w-full whitespace-nowrap px-2 text-center font-bold`}
       >
         {props.cellValue.word.toUpperCase()}
       </h2>
