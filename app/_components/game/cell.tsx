@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
+const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
+
 import { Word } from "@/app/_types";
 
 type CellProps = {
@@ -12,6 +16,59 @@ type CellProps = {
 export default function Cell(props: CellProps) {
   const bgColor = props.cellValue.selected ? "bg-slate-500" : "bg-slate-200";
   const textColor = props.cellValue.selected ? "text-stone-100" : "text-black";
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    const button = buttonRef.current;
+    const heading = headingRef.current;
+
+    if (!button || !heading) {
+      return undefined;
+    }
+
+    const adjustFontSize = () => {
+      const isDesktop = window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+      const maxFontSize = isDesktop ? 24 : 16;
+      const minFontSize = 10;
+
+      const buttonStyles = window.getComputedStyle(button);
+      const buttonPaddingLeft = parseFloat(buttonStyles.paddingLeft) || 0;
+      const buttonPaddingRight = parseFloat(buttonStyles.paddingRight) || 0;
+      const availableWidth = Math.max(
+        0,
+        button.clientWidth - (buttonPaddingLeft + buttonPaddingRight)
+      );
+
+      heading.style.fontSize = `${maxFontSize}px`;
+
+      const headingWidth = heading.scrollWidth;
+
+      if (headingWidth <= availableWidth || availableWidth === 0) {
+        return;
+      }
+
+      const ratio = availableWidth / headingWidth;
+      const nextSize = Math.max(
+        minFontSize,
+        Math.min(maxFontSize, Math.floor(maxFontSize * ratio))
+      );
+
+      heading.style.fontSize = `${nextSize}px`;
+    };
+
+    adjustFontSize();
+
+    const resizeObserver = new ResizeObserver(() => {
+      adjustFontSize();
+    });
+
+    resizeObserver.observe(button);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [props.cellValue.word]);
 
   const handleClick = () => {
     props.onClick(props.cellValue);
@@ -24,10 +81,14 @@ export default function Cell(props: CellProps) {
 
   return (
     <button
-      className={`${bgColor} py-6 rounded-md break-all px-1 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
+      ref={buttonRef}
+      className={`${bgColor} flex items-center justify-center rounded-md px-3 py-6 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
       onClick={handleClick}
     >
-      <h2 className={`${textColor} text-xs md:text-lg text-center font-bold`}>
+      <h2
+        ref={headingRef}
+        className={`${textColor} block min-w-0 max-w-full whitespace-nowrap px-2 text-center font-bold`}
+      >
         {props.cellValue.word.toUpperCase()}
       </h2>
     </button>
