@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { Word } from "@/app/_types";
 
 type CellProps = {
@@ -12,23 +14,42 @@ type CellProps = {
 export default function Cell(props: CellProps) {
   const bgColor = props.cellValue.selected ? "bg-slate-500" : "bg-slate-200";
   const textColor = props.cellValue.selected ? "text-stone-100" : "text-black";
-  const wordLength = props.cellValue.word.length;
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const fontSizeClass = (() => {
-    if (wordLength > 14) {
-      return "text-[10px] md:text-base";
+  useEffect(() => {
+    const button = buttonRef.current;
+    const heading = headingRef.current;
+
+    if (!button || !heading) {
+      return;
     }
 
-    if (wordLength > 10) {
-      return "text-xs md:text-lg";
-    }
+    const adjustFontSize = () => {
+      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+      const maxFontSize = isDesktop ? 24 : 16;
+      const minFontSize = 10;
 
-    if (wordLength > 7) {
-      return "text-sm md:text-xl";
-    }
+      heading.style.fontSize = `${maxFontSize}px`;
 
-    return "text-base md:text-2xl";
-  })();
+      while (
+        heading.scrollWidth > button.clientWidth &&
+        parseFloat(heading.style.fontSize) > minFontSize
+      ) {
+        const nextSize = Math.max(minFontSize, parseFloat(heading.style.fontSize) - 1);
+        heading.style.fontSize = `${nextSize}px`;
+      }
+    };
+
+    adjustFontSize();
+
+    const handleResize = () => adjustFontSize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [props.cellValue.word]);
 
   const handleClick = () => {
     props.onClick(props.cellValue);
@@ -41,10 +62,14 @@ export default function Cell(props: CellProps) {
 
   return (
     <button
+      ref={buttonRef}
       className={`${bgColor} py-6 rounded-md px-1 transition ease-in-out ${guessAnimation} ${wrongGuessAnimation}`}
       onClick={handleClick}
     >
-      <h2 className={`${textColor} ${fontSizeClass} text-center font-bold whitespace-nowrap`}>
+      <h2
+        ref={headingRef}
+        className={`${textColor} text-center font-bold whitespace-nowrap`}
+      >
         {props.cellValue.word.toUpperCase()}
       </h2>
     </button>
