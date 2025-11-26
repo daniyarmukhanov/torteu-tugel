@@ -17,7 +17,7 @@ type StoredGameResult = {
 };
 
 const STORAGE_KEY = "storedGameResult";
-const DEFAULT_MISTAKES_REMAINING = 4;
+const DEFAULT_MISTAKES_REMAINING = 5;
 
 type LoadPuzzleOptions = {
   forceRefresh?: boolean;

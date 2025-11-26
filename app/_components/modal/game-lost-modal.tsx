@@ -29,7 +29,8 @@ export default function GameLostModal(props: GameLostModalProps) {
     });
 
     const shareText = ` Қап!
-Келесі жолы бақ сынап көріңіз.
+Wolt Сәлемдемелер арқылы досыңыздан сөздік ала тұрсаңыз қайтеді?
+9 желтоқсанға дейін — 50% жеңілдік 😍
 
 
 ${historyEmojiString}
@@ -57,6 +58,11 @@ ${window.location.href}`;
           {"Ертең жаңа сұрақ болады!"}
         </h1>
         <hr className="mb-2 md:mb-4 w-full"></hr>
+        <h2 className="text-black mb-8 text-center">
+          Wolt Сәлемдемелер арқылы досыңыздан сөздік ала тұрсаңыз қайтеді?
+          <br />
+          9 желтоқсанға дейін — 50% жеңілдік 😍
+        </h2>
         <GuessHistory guessHistory={props.guessHistory} />
         <div className="mt-6 flex items-center justify-center gap-4">
           <ControlButton text="Бөлісу" onClick={handleShare} />

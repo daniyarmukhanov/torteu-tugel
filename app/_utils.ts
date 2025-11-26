@@ -17,7 +17,7 @@ export const getWordColor = (category: 1 | 2 | 3 | 4): string => {
     case 2:
       return "bg-lime-500";
     case 3:
-      return "bg-blue-300";
+      return "bg-[#00C2E8]";
     case 4:
       return "bg-purple-400";
     default:
@@ -27,11 +27,11 @@ export const getWordColor = (category: 1 | 2 | 3 | 4): string => {
 
 export const getPerfection = (mistakesRemaining: number) => {
   switch (mistakesRemaining) {
-    case 4:
+    case 5:
       return "Мінсіз өттіңіз!";
-    case 3:
+    case 4:
       return "Керемет!";
-    case 2:
+    case 3:
       return "Жақсы!";
     default:
       return "Сәл-ақ қалды!";
