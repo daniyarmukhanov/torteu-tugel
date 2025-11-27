@@ -8,7 +8,6 @@ type StoredGameStatus = "in-progress" | "loss" | "win";
 
 type StoredGameResult = {
   date: string;
-  version: number;
   status: StoredGameStatus;
   clearedCategories: Category[];
   guessHistory: Word[][];
@@ -18,7 +17,6 @@ type StoredGameResult = {
 };
 
 const STORAGE_KEY = "storedGameResult";
-const STORAGE_VERSION = 2;
 const DEFAULT_MISTAKES_REMAINING = 5;
 
 type LoadPuzzleOptions = {
@@ -60,24 +58,17 @@ const readStoredGameResult = (): StoredGameResult | null => {
     const date = parsed.date;
     const storedPuzzleId =
       typeof parsed.puzzleId === "string" ? parsed.puzzleId : null;
-    const version = parsed.version;
 
     const isValidStatus =
       status === "in-progress" || status === "win" || status === "loss";
 
-    if (
-      !isValidStatus ||
-      typeof date !== "string" ||
-      !storedPuzzleId ||
-      version !== STORAGE_VERSION
-    ) {
+    if (!isValidStatus || typeof date !== "string" || !storedPuzzleId) {
       window.localStorage.removeItem(STORAGE_KEY);
       return null;
     }
 
     return {
       date,
-      version: STORAGE_VERSION,
       status,
       puzzleId: storedPuzzleId,
       clearedCategories: Array.isArray(parsed.clearedCategories)
@@ -294,7 +285,6 @@ export default function useGameLogic() {
 
     const payload: StoredGameResult = {
       date: today,
-      version: STORAGE_VERSION,
       status,
       puzzleId: currentPuzzleId,
       clearedCategories:
