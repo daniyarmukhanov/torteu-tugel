@@ -146,14 +146,10 @@ export default function Home() {
             wrongGuessAnimationState={wrongGuessAnimationState}
           />
         </div>
-        <h2 className="text-black my-4 md:my-8 mx-8 text-center">
+        <h2 className="text-black my-4 md:my-8 mx-8">
           Мүмкіндіктер саны:{" "}
           {mistakesRemaining > 0 ? Array(mistakesRemaining).fill("•") : ""}
         </h2>
-        <p className="text-black text-center my-2 mx-8">
-          Бүгін мүмкіндік саны бесеу! Бір қосымша ұпай — серіктесіміз Wolt
-          компаниясынан сіздерге сыйлық 🎁
-        </p>
         {renderControlButtons()}
         <footer className="mt-4 mb-8 text-center text-sm">
           <a
